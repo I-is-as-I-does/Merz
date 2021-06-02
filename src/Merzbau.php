@@ -5,7 +5,7 @@ namespace SSITU\Merz;
 
 use SSITU\Jack\Jack;
 
-class Merzbau  {
+class Merzbau implements Merzbau_i {
 
     private $config;
    
