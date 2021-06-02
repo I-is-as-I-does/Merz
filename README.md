@@ -36,7 +36,7 @@ require_once 'path/to/vendor/autoload.php';
 $configPath = 'path/to/merz-config.json';
 $jobId = "your-job-id";
 $profile = "some-profile-id";
-$merz = new Merbau($configPath);
+$merz = new Merzbau($configPath);
 $do = $merz->runJob($jobId, $profile);
 ```
 
