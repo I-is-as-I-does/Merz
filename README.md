@@ -18,7 +18,7 @@ Structure:
           "firstParam": [
               "..."
             ],
-          "anotherParam":"...",
+          "anotherParam":"some/path/something-{profile}.json",
           "profile":"{profile}"
         }
       }
@@ -41,7 +41,7 @@ $do = $merz->runJob($jobId, $profile);
 ```
 
 'Profiles' are a way to run a job with some variations.  
-`{profile}` in a path, for example, will be replaced by the "profile" argument of `runJob`.
+Any occurence of `{profile}` (inserted in a path, for example) will be replaced by the "profile" argument of `runJob`.
 
 ## CLI
 
