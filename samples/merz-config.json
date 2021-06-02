@@ -1,0 +1,19 @@
+{
+    "jobs": {
+      "studio-pages": {
+        "method": "mergeJson",
+        "param": {
+          "globPatterns": [
+              "some/path/*.json",
+              "some/other/path*-config.json",           
+              "some/specific/path/{profile}-*/bundle/*-config.json"
+            ],
+          "destination": "final/destination/path/config-{profile}.json",
+          "removeSuffix":"-config",
+          "removePrefix":"",
+          "profile":"{profile}"
+        }
+      }
+    }
+  }
+  
