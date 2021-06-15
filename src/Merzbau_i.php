@@ -6,5 +6,5 @@ namespace SSITU\Merz;
 interface Merzbau_i
 {
     public function __construct($configPath);
-    public function runJob($jobId, $profile = '');
+    public function runJob(string $jobId, string $profile = '');
 }
