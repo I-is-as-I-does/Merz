@@ -3,88 +3,203 @@
 
 namespace SSITU\Merz;
 
-use SSITU\Jack\Jack;
+use \SSITU\Jack\Jack;
 
-class Merzbau implements Merzbau_i {
+class Merzbau implements Merzbau_i
+{
 
-    private $config;
-   
-    public function __construct($configPath){
-        $config = Jack::File()->readJson($configPath);
-        if(empty($config) || !array_key_exists('jobs',$config)){
-            return ['err'=>'invalid config path or content: '.$configPath];
-        }
-        $this->config = $config["jobs"];
+    private $jobs;
+
+    public function __construct($jobs)
+    {
+        $this->jobs = $jobs;
     }
 
-    public function runJob(string $jobId, string $profile = ''){
-        if(!array_key_exists($jobId, $this->config)){
-            return ['err'=>'unknown job: '.$jobId];
+    public function updateJobs($job, $paramKey, $paramVal)
+    {
+        if (array_key_exists($job, $this->jobs) && array_key_exists($paramKey, $this->jobs[$job]['param'])) {
+            $this->jobs[$job]['param'][$paramKey] = $paramVal;
         }
-            if(!array_key_exists('method',$this->config[$jobId])){
-                return ['err'=>'method has not been specified'];
-            }
-            $method = $this->config[$jobId]['method'];
-            if(!method_exists($this,$method)){
-                return ['err'=>'unknown method :'.$method];
-            }
-
-            if(!array_key_exists('param',$this->config[$jobId])){
-                return ['err'=>'Params have not been specified'];
-            }
-
-       
-            if(array_key_exists('profile',$this->config[$jobId]["param"]) && $this->config[$jobId]["param"]['profile'] == '{profile}'){
-                $this->config[$jobId]["param"]['profile'] = $profile;
-            }  
-            
-            $param = $this->config[$jobId]["param"]; 
-            return $this->$method(...$param);
 
     }
 
-    protected function mergeJson($globPatterns, $destination, $removeSuffix ='', $removePrefix ='', $profile =''){
+    public function runJob(string $jobId, string $profile = '')
+    {
+        if (!array_key_exists($jobId, $this->jobs)) {
+            return ['err' => 'unknown job: ' . $jobId];
+        }
+        if (!array_key_exists('method', $this->jobs[$jobId])) {
+            return ['err' => 'method has not been specified'];
+        }
+        $method = $this->jobs[$jobId]['method'];
+        if (!method_exists($this, $method)) {
+            return ['err' => 'unknown method :' . $method];
+        }
 
+        if (!array_key_exists('param', $this->jobs[$jobId])) {
+            return ['err' => 'Params have not been specified'];
+        }
+
+        if (array_key_exists('profile', $this->jobs[$jobId]["param"]) && $this->jobs[$jobId]["param"]['profile'] == '{profile}') {
+            $this->jobs[$jobId]["param"]['profile'] = $profile;
+        }
+
+        $param = $this->jobs[$jobId]["param"];
+        return $this->$method(...$param);
+
+    }
+
+    private function globFiles($globPatterns, $profile)
+    {
         $log = [];
         $filespaths = [];
-        foreach($globPatterns as $globPattern){
-            if(stripos($globPattern, '{profile}') !== false){
-                $globPattern = str_replace('{profile}',$profile,$globPattern);
-            }
+        foreach ($globPatterns as $globPattern) {
+            $globPattern = $this->replaceProfileHook($globPattern, $profile);
             $glob = glob($globPattern);
-            if(!empty($glob)){
-            $filespaths = array_merge($filespaths, $glob);
-        } else {
-            $log[] = "no file match for pattern: ".$globPattern;
+            if (!empty($glob)) {
+                $filespaths = array_merge($filespaths, $glob);
+            } else {
+                $log[] = "no file match for pattern: " . $globPattern;
+            }
         }
+        return ['log' => $log, 'paths' => $filespaths];
+    }
+
+    private function replaceProfileHook($path, $profile)
+    {
+        if (stripos($path, '{profile}') !== false) {
+            $path = str_replace('{profile}', $profile, $path);
         }
-        if(empty($filespaths)){
-            return ['anomaly'=>'no files found'];
+        return $path;
+    }
+
+    private function handlePrefixSuffix($path, $removeSuffix = '', $removePrefix = '', $addSuffix = '', $addPrefix = '', $profile = '')
+    {
+        $dir = dirname($path);
+        $ext = '';
+        if (!is_dir($path)) {
+            $ext = '.' . Jack::File()->getExt($path);
+        }
+        $base = basename($path, $ext);
+
+        if (!empty($removeSuffix) && stripos($base, $removeSuffix) !== false) {
+            $base = substr($base, 0, -strlen($removeSuffix));
+        }
+        if (!empty($removePrefix) && stripos($base, $removeSuffix) !== false) {
+            $base = substr($base, strlen($removePrefix));
+        }
+        if (!empty($addSuffix)) {
+            $base .= $addSuffix;
+        }
+        if (!empty($addPrefix)) {
+            $base = $base . $addPrefix;
+        }
+
+        $base = $this->replaceProfileHook($base, $profile);
+
+        return ['base' => $base, 'path' => $dir . '/' . $base . $ext];
+    }
+
+    protected function mergeJson($globPatterns, $destination, $removeSuffix = '', $removePrefix = '', $addSuffix = '', $addPrefix = '', $profile = '', $sortPages = true)
+    {
+
+        $glob = $this->globFiles($globPatterns, $profile);
+        if (empty($glob['paths'])) {
+            return ['anomaly' => 'no files found'];
         }
         $stock = [];
-        foreach($filespaths as $path){
+        foreach ($glob['paths'] as $path) {
             $content = Jack::File()->readJson($path);
-            if(empty($content)){
-                $log[] = 'either empty or invalid file: '.$path;
+            if (empty($content)) {
+                $glob['log'][] = 'either empty or invalid file: ' . $path;
                 continue;
             }
-            $id = basename($path, '.json');
-            if(!empty($removeSuffix) && stripos($id,$removeSuffix) !== false){
-                $id = substr($id,0,-strlen($removeSuffix));  
+            $rename = $this->handlePrefixSuffix($path, $removeSuffix, $removePrefix, $addSuffix, $addPrefix, $profile);
+            $stock[$rename['base']] = $content;
+        }
+        if (empty($stock)) {
+            return ['anomaly' => 'all files were either empty or invalid'];
+        }
+       
+        if($sortPages){
+        $stock = $this->sortArrayByKey($stock, 'priority');
+        foreach($stock as $k =>$section){
+         
+            $nitems = $this->sortNestedArrayByKey($section['items'], 'priority');
+             $stock[$k]['items'] = $nitems;
+        }
+    }
+
+        $destination = $this->replaceProfileHook($destination, $profile);
+
+        $glob['log']['save'] = Jack::File()->saveJson($stock, $destination, true);
+        return $glob['log'];
+    }
+
+    private function sortNestedArrayByKey($arr, $key) {
+
+        uasort($arr, function($a,$b)  use ($key){
+            if ($a[$key] == $b[$key]) return 0;
+        return ($a[$key] > $b[$key]) ? 1 : -1;
+        });
+return $arr;
+    }
+    
+  
+    private function sortArrayByKey($arr, $key)
+    {
+
+        $col = array_column($arr, $key );
+array_multisort( $col, SORT_ASC, $arr );
+return $arr;
+    }
+
+
+    protected function mapPages($sectionsPath, $profile, $destination = null)
+    {
+
+        $sectionsPath = $this->replaceProfileHook($sectionsPath, $profile);
+
+        $sections = Jack::File()->readJson($sectionsPath);
+        if (empty($sections)) {
+            return ['err' => 'invalid path or content: ' . $sectionsPath];
+        }
+        $remap = [];
+        foreach($sections as $sectionId => $sectionData){
+            foreach($sectionData['items'] as $pageId => $pagedata){
+                $remap[$pageId]['controller'] = $pagedata['controller'];
+                $remap[$pageId]['auth'] = $sectionData['auth'];
+                $remap[$pageId]['status'] = $sectionData['status'];
+                $remap[$pageId]['section'] = $sectionId;
+
             }
-            if(!empty($removePrefix) && stripos($id,$removeSuffix) !== false){
-                $id = substr($id,strlen($removePrefix));  
-            }
-            $stock[$id] = $content;
+           
         }
-        if(empty($stock)){
-            return ['anomaly'=>'all files were either empty or invalid'];
+    
+
+        if (empty($destination)) {
+            $destination = substr($sectionsPath, -5) . '-index.json';
+
+        } else {
+            $destination = $this->replaceProfileHook($destination, $profile);
+
         }
-        if(stripos($destination, '{profile}') !== false){
-            $destination = str_replace('{profile}',$profile,$destination);
+        return Jack::File()->saveJson($remap, $destination, true);
+    }
+
+    protected function recursiveRename($globPatterns, $removeSuffix = '', $removePrefix = '', $addSuffix = '', $addPrefix = '', $profile = '')
+    {
+        $glob = $this->globFiles($globPatterns, $profile);
+        if (empty($glob['paths'])) {
+            return ['anomaly' => 'no files found'];
         }
-        $log['save'] = Jack::File()->saveJson($stock, $destination,true);
-       return $log;
+        $log = [];
+        foreach ($glob['paths'] as $path) {
+            $rename = $this->handlePrefixSuffix($path, $removeSuffix, $removePrefix, $addSuffix, $addPrefix, $profile);
+            $log[$rename['base']] = rename($path, $rename['path']);
+
+        }
+        return $log;
     }
 
 }
