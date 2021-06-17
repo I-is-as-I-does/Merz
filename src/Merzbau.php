@@ -168,10 +168,8 @@ return $arr;
         foreach($sections as $sectionId => $sectionData){
             foreach($sectionData['items'] as $pageId => $pagedata){
                 $remap[$pageId]['controller'] = $pagedata['controller'];
-                $remap[$pageId]['auth'] = $sectionData['auth'];
+                $remap[$pageId]['section'] = $sectionData['auth'];
                 $remap[$pageId]['status'] = $sectionData['status'];
-                $remap[$pageId]['section'] = $sectionId;
-
             }
            
         }
