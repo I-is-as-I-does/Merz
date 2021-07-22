@@ -2,9 +2,7 @@
 /* This file is part of Merz | SSITU | (c) 2021 I-is-as-I-does | MIT License */
 
 namespace SSITU\Merz;
-
-use \SSITU\Jack\Jack;
-
+use \SSITU\Jack;
 class Merzbau implements Merzbau_i
 {
 
@@ -78,7 +76,7 @@ class Merzbau implements Merzbau_i
         $dir = dirname($path);
         $ext = '';
         if (!is_dir($path)) {
-            $ext = '.' . Jack::File()->getExt($path);
+            $ext = '.' . Jack\File::getExt($path);
         }
         $base = basename($path, $ext);
 
@@ -109,7 +107,7 @@ class Merzbau implements Merzbau_i
         }
         $stock = [];
         foreach ($glob['paths'] as $path) {
-            $content = Jack::File()->readJson($path);
+            $content = Jack\File::readJson($path);
             if (empty($content)) {
                 $glob['log'][] = 'either empty or invalid file: ' . $path;
                 continue;
@@ -120,60 +118,61 @@ class Merzbau implements Merzbau_i
         if (empty($stock)) {
             return ['anomaly' => 'all files were either empty or invalid'];
         }
-       
-        if($sortPages){
-        $stock = $this->sortArrayByKey($stock, 'priority');
-        foreach($stock as $k =>$section){
-         
-            $nitems = $this->sortNestedArrayByKey($section['items'], 'priority');
-             $stock[$k]['items'] = $nitems;
+
+        if ($sortPages) {
+            $stock = $this->sortArrayByKey($stock, 'priority');
+            foreach ($stock as $k => $section) {
+
+                $nitems = $this->sortNestedArrayByKey($section['items'], 'priority');
+                $stock[$k]['items'] = $nitems;
+            }
         }
-    }
 
         $destination = $this->replaceProfileHook($destination, $profile);
 
-        $glob['log']['save'] = Jack::File()->saveJson($stock, $destination, true);
+        $glob['log']['save'] = Jack\File::saveJson($stock, $destination, true);
         return $glob['log'];
     }
 
-    private function sortNestedArrayByKey($arr, $key) {
+    private function sortNestedArrayByKey($arr, $key)
+    {
 
-        uasort($arr, function($a,$b)  use ($key){
-            if ($a[$key] == $b[$key]) return 0;
-        return ($a[$key] > $b[$key]) ? 1 : -1;
+        uasort($arr, function ($a, $b) use ($key) {
+            if ($a[$key] == $b[$key]) {
+                return 0;
+            }
+
+            return ($a[$key] > $b[$key]) ? 1 : -1;
         });
-return $arr;
+        return $arr;
     }
-    
-  
+
     private function sortArrayByKey($arr, $key)
     {
 
-        $col = array_column($arr, $key );
-array_multisort( $col, SORT_ASC, $arr );
-return $arr;
+        $col = array_column($arr, $key);
+        array_multisort($col, SORT_ASC, $arr);
+        return $arr;
     }
-
 
     protected function mapPages($sectionsPath, $profile, $destination = null)
     {
 
         $sectionsPath = $this->replaceProfileHook($sectionsPath, $profile);
 
-        $sections = Jack::File()->readJson($sectionsPath);
+        $sections = Jack\File::readJson($sectionsPath);
         if (empty($sections)) {
             return ['err' => 'invalid path or content: ' . $sectionsPath];
         }
         $remap = [];
-        foreach($sections as $sectionId => $sectionData){
-            foreach($sectionData['items'] as $pageId => $pagedata){
+        foreach ($sections as $sectionId => $sectionData) {
+            foreach ($sectionData['items'] as $pageId => $pagedata) {
                 $remap[$pageId]['controller'] = $pagedata['controller'];
                 $remap[$pageId]['section'] = $sectionData['auth'];
                 $remap[$pageId]['status'] = $sectionData['status'];
             }
-           
+
         }
-    
 
         if (empty($destination)) {
             $destination = substr($sectionsPath, -5) . '-index.json';
@@ -182,7 +181,7 @@ return $arr;
             $destination = $this->replaceProfileHook($destination, $profile);
 
         }
-        return Jack::File()->saveJson($remap, $destination, true);
+        return Jack\File::saveJson($remap, $destination, true);
     }
 
     protected function recursiveRename($globPatterns, $removeSuffix = '', $removePrefix = '', $addSuffix = '', $addPrefix = '', $profile = '')

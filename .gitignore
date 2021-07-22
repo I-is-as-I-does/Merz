@@ -1,4 +1,10 @@
 *.code-workspace
-vendor/
+.env
+env/*
 composer.lock
-.fridge
+vendor/*
+.vscode/*
+.fridge/*
+node_modules/
+.autogit/*
+.git/*
